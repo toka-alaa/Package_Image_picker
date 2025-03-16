@@ -17,6 +17,7 @@ class MyPackage extends StatefulWidget {
 class _MyPackageState extends State<MyPackage> {
   File? selectedFile;
   VideoPlayerController? videoController;
+  bool isVideo = false;
 
   @override
   void dispose() {
@@ -32,74 +33,55 @@ class _MyPackageState extends State<MyPackage> {
         backgroundColor: Colors.amber,
         body: Center(
           child: Column(
-            spacing: 30,
             mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
+            children: [
               SizedBox(
                 width: 200,
                 height: 200,
                 child: selectedFile != null
-                    ? (videoController != null
-                        ? AspectRatio(
-                            aspectRatio: videoController!.value.aspectRatio,
-                            child: VideoPlayer(videoController!),
-                          )
-                        : Image.file(selectedFile!))
-                    : const Icon(
-                        Icons.image,
-                        size: 100,
-                        color: Colors.black,
-                      ),
+                    ? isVideo
+                        ? (videoController != null &&
+                                videoController!.value.isInitialized
+                            ? AspectRatio(
+                                aspectRatio: videoController!.value.aspectRatio,
+                                child: VideoPlayer(videoController!),
+                              )
+                            : const CircularProgressIndicator())
+                        : Image.file(selectedFile!,
+                            errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.broken_image,
+                                size: 100, color: Colors.red);
+                          })
+                    : const Icon(Icons.image, size: 100, color: Colors.black),
               ),
-              Text(
+              const SizedBox(height: 20),
+              const Text(
                 "Image Picker",
                 style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black),
               ),
-              SizedBox(
-                height: 10,
-              ),
-              SizedBox(
-                width: 300,
-                height: 50,
-                child: MaterialButton(
-                  onPressed: () {
-                    pickMedia(ImageSource.gallery);
-                  },
-                  elevation: 5,
-                  color: Colors.white,
-                  child: Row(
-                    spacing: 20,
-                    children: [
-                      Icon(Icons.photo),
-                      const Text('Pick gallery',
-                          style: TextStyle(fontSize: 25, color: Colors.black)),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 300,
-                height: 50,
-                child: MaterialButton(
-                  onPressed: () {
-                    galleryImage(ImageSource.camera);
-                  },
-                  color: Colors.white,
-                  elevation: 5,
-                  child: Row(
-                    spacing: 20,
-                    children: [
-                      Icon(Icons.camera_alt),
-                      const Text('Pick camera',
-                          style: TextStyle(fontSize: 25, color: Colors.black)),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 10),
+              CustomButton(
+                  icon: Icons.photo,
+                  text: "Pick Image from Gallery",
+                  onPressed: () => getImage(ImageSource.gallery)),
+              const SizedBox(height: 10),
+              CustomButton(
+                  icon: Icons.camera_alt,
+                  text: "Pick Image from Camera",
+                  onPressed: () => getImage(ImageSource.camera)),
+              const SizedBox(height: 10),
+              CustomButton(
+                  icon: Icons.video_library,
+                  text: "Pick Video from Gallery",
+                  onPressed: () => getVideo(ImageSource.gallery)),
+              const SizedBox(height: 10),
+              CustomButton(
+                  icon: Icons.videocam,
+                  text: "Pick Video from Camera",
+                  onPressed: () => getVideo(ImageSource.camera)),
             ],
           ),
         ),
@@ -107,32 +89,64 @@ class _MyPackageState extends State<MyPackage> {
     );
   }
 
-  Future<void> pickMedia(ImageSource source) async {
+  Future<void> getVideo(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
-
-    final XFile? media = await picker.pickMedia();
+    final XFile? media = await picker.pickVideo(source: source);
     if (media == null) return;
 
     setState(() {
       selectedFile = File(media.path);
+      isVideo = true;
+      videoController?.dispose();
+      videoController = VideoPlayerController.file(selectedFile!)
+        ..initialize().then((_) {
+          setState(() {});
+          videoController!.play();
+        });
     });
   }
 
-  Future<void> galleryImage(ImageSource source) async {
-    final returnedImage =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+  Future<void> getImage(ImageSource source) async {
+    final returnedImage = await ImagePicker().pickImage(source: source);
     if (returnedImage == null) return;
+
     setState(() {
       selectedFile = File(returnedImage.path);
+      isVideo = false;
+      videoController?.dispose();
+      videoController = null;
     });
   }
+}
 
-  Future<void> cameraImage() async {
-    final returnedImage =
-        await ImagePicker().pickImage(source: ImageSource.camera);
-    if (returnedImage == null) return;
-    setState(() {
-      selectedFile = File(returnedImage.path);
-    });
+class CustomButton extends StatelessWidget {
+  const CustomButton(
+      {super.key,
+      required this.icon,
+      required this.text,
+      required this.onPressed});
+  final IconData icon;
+  final String text;
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 300,
+      height: 50,
+      child: MaterialButton(
+        onPressed: onPressed,
+        color: Colors.white,
+        elevation: 5,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon),
+            const SizedBox(width: 10),
+            Text(text,
+                style: const TextStyle(fontSize: 20, color: Colors.black)),
+          ],
+        ),
+      ),
+    );
   }
 }
